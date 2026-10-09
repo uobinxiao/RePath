@@ -13,6 +13,7 @@ def load_config(config_name: str):
     return OmegaConf.load(pathlib.Path(__file__).parent.resolve() / config_filename)
 
 def load_and_merge_config(default_config:str, config_name: str):
-    default_config = OmegaConf.create(load_config("ssl_default_config"))
+    #default_config = OmegaConf.create(load_config("ssl_default_config"))
+    default_config = OmegaConf.create(load_config("simdino_config.yaml"))
     loaded_config = load_config(config_name)
     return OmegaConf.merge(default_config, loaded_config)

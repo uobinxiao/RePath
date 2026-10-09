@@ -52,7 +52,7 @@ def main():
     args.ngpus = 4
     setup_logging()
     assert os.path.exists(args.config_file), f"Configuration file {args.config_file} does not exist!"
-    submit_jobs(Evaluator, args, name="dinov2:knn")
+    submit_jobs(Evaluator, args)
     return 0
 
 

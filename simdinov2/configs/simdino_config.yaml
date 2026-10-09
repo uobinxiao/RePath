@@ -110,5 +110,11 @@ crops:
   - 0.4
   global_crops_size: 224
   local_crops_size: 96
+  # Pixels outside the inclusive OpenCV HSV tissue range count as background.
+  # Reject crops at or above this background ratio; 1.0 rejects tissue-free crops.
+  max_white_ratio: 1.0
+  tissue_hsv_lower: [90, 8, 103]
+  tissue_hsv_upper: [180, 255, 255]
+  tissue_crop_max_attempts: 10
 evaluation:
   eval_period_epochs: 10

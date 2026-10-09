@@ -327,12 +327,12 @@ class DetrTransformerDecoderLayer(BaseTransformerLayer):
             in ffn. Default 0.0.
         operation_order (tuple[str]): The execution order of operation
             in transformer. Such as ('self_attn', 'norm', 'ffn', 'norm').
-            Default：None
+            Default: None
         act_cfg (dict): The activation config for FFNs. Default: `LN`
         norm_cfg (dict): Config dict for normalization layer.
             Default: `LN`.
         ffn_num_fcs (int): The number of fully-connected layers in FFNs.
-            Default：2.
+            Default: 2.
     """
 
     def __init__(
@@ -365,7 +365,7 @@ class DetrTransformerEncoder(TransformerLayerSequence):
     """TransformerEncoder of DETR.
 
     Args:
-        post_norm_cfg (dict): Config of last normalization layer. Default：
+        post_norm_cfg (dict): Config of last normalization layer. Default:
             `LN`. Only used when `self.pre_norm` is `True`
     """
 
@@ -395,7 +395,7 @@ class DetrTransformerDecoder(TransformerLayerSequence):
 
     Args:
         return_intermediate (bool): Whether to return intermediate outputs.
-        post_norm_cfg (dict): Config of last normalization layer. Default：
+        post_norm_cfg (dict): Config of last normalization layer. Default:
             `LN`.
     """
 
@@ -519,7 +519,7 @@ class DeformableDetrTransformerDecoder(TransformerLayerSequence):
 
     Args:
         return_intermediate (bool): Whether to return intermediate outputs.
-        coder_norm_cfg (dict): Config of last normalization layer. Default：
+        coder_norm_cfg (dict): Config of last normalization layer. Default:
             `LN`.
     """
 

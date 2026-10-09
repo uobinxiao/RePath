@@ -1,0 +1,24 @@
+MODEL:
+  INIT_WEIGHTS: "__REPATH_PRIVATE_PROJECT_ROOT_002__/tcga-extra/simdinov2_vitb14.pth"
+  WEIGHTS: ''
+train:
+  output_dir: /dinov2/outputs/vitb14_magtoken_simdinov2
+  num_workers: 30
+  centering: none
+  batch_size_per_gpu: 96
+  OFFICIAL_EPOCH_LENGTH: 1250
+student:
+  arch: vit_base
+  drop_path_rate: 0.2
+  layerscale: 0.1
+  patch_size: 14
+  num_register_tokens: 0
+teacher:
+  momentum_teacher: 0.9
+optim:
+  epochs: 400
+  base_lr: 0.0004
+crops:
+  local_crops_size: 98
+evaluation:
+  eval_period_epochs: 4

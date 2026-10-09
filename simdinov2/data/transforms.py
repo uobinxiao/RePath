@@ -8,7 +8,31 @@ from typing import Sequence
 import torch
 from torchvision import transforms
 from timm.data import create_transform
+import torchvision.transforms.functional as F
+import random
 
+class RandomRotateList(torch.nn.Module):
+    def __init__(self, rotation_list, p = 0.5):
+        super().__init__()
+        self.p = p
+        self.rotation_list = rotation_list
+
+    def forward(self, x):
+        if random.random() < self.p:
+            angle = random.choice(self.rotation_list)
+            return F.rotate(x, angle)
+        return x
+
+class RandomRotate90or270(torch.nn.Module):
+    def __init__(self, p=0.5):
+        super().__init__()
+        self.p = p
+
+    def forward(self, x):
+        if random.random() < self.p:
+            angle = random.choice([90, 270])
+            return F.rotate(x, angle)
+        return x
 
 class GaussianBlur(transforms.RandomApply):
     """

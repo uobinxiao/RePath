@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "profile": "sample_smoke",
+  "magnifications": [5, 10, 20, 40],
+  "clustering_root": "../tmp/cpath_hierarchical_sample",
+  "projected_feature_dirs": {
+    "5": "../tmp/offline_smoke_inputs/projected/5x",
+    "10": "../tmp/offline_smoke_inputs/projected/10x",
+    "20": "../tmp/offline_smoke_inputs/projected/20x",
+    "40": "../tmp/offline_smoke_inputs/projected/40x"
+  },
+  "metadata_path": "../fixtures/metadata_sample.json",
+  "prompt_embeddings_path": "../tmp/offline_smoke_inputs/prompt_embeddings.h5",
+  "output_dir": "../tmp/cpath_offline_sample",
+  "statistics": {
+    "tissue_key": "primary_site",
+    "coverage_min_tiles": 20,
+    "coverage_min_patients": 1
+  },
+  "semantic": {
+    "use_artifact_score_in_composite": false
+  },
+  "buckets": {
+    "enable_artifact_exclusion": false,
+    "support_exclude_below_patients": 1,
+    "bridge_min_patients": 1,
+    "bridge_min_coverage": 2,
+    "architecture_min_patients": 1,
+    "architecture_min_coverage": 2,
+    "architecture_specific_min_patients": 1,
+    "architecture_specific_min_coverage": 2,
+    "rare_min_patients": 1,
+    "tissue_specific_min_patients": 1
+  },
+  "audit": {
+    "clusters_per_bucket": 10,
+    "tiles_per_cluster": 20,
+    "max_tiles_per_wsi": 2,
+    "representative_sample_size": 100000,
+    "seed": 7,
+    "manifest_only": true,
+    "strict_wsi": false
+  },
+  "wsi": {
+    "root": null,
+    "manifest": null,
+    "path_template": "{wsi_root}/{file_id}/{file_name}"
+  }
+}

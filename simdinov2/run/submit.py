@@ -20,13 +20,19 @@ from simdinov2.utils.cluster import (
 logger = logging.getLogger("dinov2")
 
 
+def _positive_int(value: str) -> int:
+    parsed_value = int(value)
+    if parsed_value <= 0:
+        raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
+    return parsed_value
+
+
 def get_args_parser(
     description: Optional[str] = None,
     parents: Optional[List[argparse.ArgumentParser]] = None,
     add_help: bool = True,
 ) -> argparse.ArgumentParser:
     parents = parents or []
-    slurm_partition = None
     parser = argparse.ArgumentParser(
         description=description,
         parents=parents,
@@ -55,9 +61,33 @@ def get_args_parser(
     )
     parser.add_argument(
         "--partition",
-        default=slurm_partition,
+        default=None,
         type=str,
         help="Partition where to submit",
+    )
+    parser.add_argument(
+        "--account",
+        default=None,
+        type=str,
+        help="Slurm account to charge",
+    )
+    parser.add_argument(
+        "--job-name",
+        default=None,
+        type=str,
+        help="Slurm job name",
+    )
+    parser.add_argument(
+        "--mem-gb",
+        default=None,
+        type=_positive_int,
+        help="Total memory in GB to request on each node",
+    )
+    parser.add_argument(
+        "--cpus-per-task",
+        default=None,
+        type=_positive_int,
+        help="Number of CPUs to request for each task",
     )
     parser.add_argument(
         "--use-volta32",
@@ -88,7 +118,7 @@ def get_shared_folder() -> Path:
     return path
 
 
-def submit_jobs(task_class, args, name: str):
+def submit_jobs(task_class, args):
     if not args.output_dir:
         args.output_dir = str(get_shared_folder() / "%j")
 
@@ -96,22 +126,26 @@ def submit_jobs(task_class, args, name: str):
     executor = submitit.AutoExecutor(folder=args.output_dir, slurm_max_num_timeout=30)
 
     kwargs = {}
-    if args.use_volta32:
-        kwargs["slurm_constraint"] = "volta32gb"
-    if args.comment:
-        kwargs["slurm_comment"] = args.comment
-    if args.exclude:
-        kwargs["slurm_exclude"] = args.exclude
+    #if args.use_volta32:
+    #    kwargs["slurm_constraint"] = "volta32gb"
+    #if args.comment:
+    #    kwargs["slurm_comment"] = args.comment
+    #if args.exclude:
+    #    kwargs["slurm_exclude"] = args.exclude
     executor_params = get_slurm_executor_parameters(
         nodes=args.nodes,
-        cpus_per_task=16,
         num_gpus_per_node=args.ngpus,
+        cpus_per_task=args.cpus_per_task,
+        mem_gb=args.mem_gb,
         timeout_min=args.timeout,  # max is 60 * 72
         slurm_signal_delay_s=120,
         slurm_partition=args.partition,
+        slurm_account=args.account,
         **kwargs,
     )
-    executor.update_parameters(name=name, **executor_params)
+    if args.job_name:
+        executor_params["name"] = args.job_name
+    executor.update_parameters(**executor_params)
 
     task = task_class(args)
     job = executor.submit(task)

@@ -156,7 +156,9 @@ class SimSSLMetaArch(nn.Module):
         mask_indices_list = images["mask_indices_list"].cuda(non_blocking=True)
         n_masked_patches_tensor = images["n_masked_patches"].cuda(non_blocking=True)
         n_masked_patches = mask_indices_list.shape[0]
-        #upperbound = images["upperbound"] #upperbound逻辑和修改后逻辑一致, 可以在多机训练中带来内存对齐但效率提升待确认
+        # The upperbound logic matches the revised logic and may provide memory alignment
+        # during multi-node training; any performance improvement remains to be confirmed.
+        #upperbound = images["upperbound"]
         masks_weight = images["masks_weight"].cuda(non_blocking=True)
         
         do_ibot = self.do_ibot
@@ -232,11 +234,20 @@ class SimSSLMetaArch(nn.Module):
         loss_accumulator = 0  # for backprop
         if "nested" in self.cfg.student.block: #nested computation tricks
             student_global_backbone_output_dict, student_local_backbone_output_dict = self.student.backbone(
-                [global_crops, local_crops], masks=[masks, None], is_training=True
+                [global_crops, local_crops],
+                masks=[masks, None],
+                is_training=True,
             )
         else:
-            student_global_backbone_output_dict = self.student.backbone(global_crops, masks=masks, is_training=True)
-            student_local_backbone_output_dict = self.student.backbone(local_crops, is_training=True)
+            student_global_backbone_output_dict = self.student.backbone(
+                global_crops,
+                masks=masks,
+                is_training=True,
+            )
+            student_local_backbone_output_dict = self.student.backbone(
+                local_crops,
+                is_training=True,
+            )
 
         inputs_for_student_head = []
 

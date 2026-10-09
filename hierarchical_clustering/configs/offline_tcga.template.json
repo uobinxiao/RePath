@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "profile": "production",
+  "magnifications": [5, 10, 20, 40],
+  "clustering_root": "__REPATH_PRIVATE_SCRATCH_ROOT_004__/hierarchical_clustering_conch_v1",
+  "projected_feature_dirs": {
+    "5": "__REPATH_PRIVATE_SCRATCH_ROOT_007__/5x_256px_0px_overlap/features_conch_v1_text_aligned",
+    "10": "__REPATH_PRIVATE_SCRATCH_ROOT_007__/10x_256px_0px_overlap/features_conch_v1_text_aligned",
+    "20": "__REPATH_PRIVATE_SCRATCH_ROOT_007__/20x_256px_0px_overlap/features_conch_v1_text_aligned",
+    "40": "__REPATH_PRIVATE_SCRATCH_ROOT_007__/40x_256px_0px_overlap/features_conch_v1_text_aligned"
+  },
+  "metadata_path": "__REPATH_PRIVATE_SCRATCH_ROOT_004__/metadata_with_organ.json",
+  "prompt_embeddings_path": "__REPATH_PRIVATE_SCRATCH_ROOT_004__/conch_text_concept_ensemble.h5",
+  "output_dir": "__REPATH_PRIVATE_SCRATCH_ROOT_004__/offline_index",
+  "levels": {
+    "fine": 1,
+    "coarse": 2
+  },
+  "statistics": {
+    "tissue_key": "primary_site",
+    "coverage_min_tiles": 20,
+    "coverage_min_patients": 3
+  },
+  "semantic": {
+    "use_artifact_score_in_composite": false
+  },
+  "buckets": {
+    "enable_artifact_exclusion": false,
+    "architecture_specific_min_score": 0.70,
+    "architecture_specific_min_patients": 10,
+    "architecture_specific_min_coverage": 3,
+    "architecture_specific_max_entropy": 0.50
+  },
+  "wsi": {
+    "root": "__REPATH_PRIVATE_SCRATCH_ROOT_008__",
+    "manifest": null,
+    "path_template": "{wsi_root}/{file_id}/{file_name}"
+  },
+  "audit": {
+    "clusters_per_bucket": 50,
+    "tiles_per_cluster": 20,
+    "max_tiles_per_wsi": 2,
+    "representative_sample_size": 1000000,
+    "seed": 7,
+    "manifest_only": false,
+    "strict_wsi": true
+  }
+}

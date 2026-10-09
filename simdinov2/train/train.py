@@ -5,6 +5,8 @@
 
 from builtins import dict
 import argparse
+import hashlib
+import json
 import logging
 import math
 import os
@@ -18,7 +20,8 @@ import traceback
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..')))
 from simdinov2.utils.checkpoint import PeriodicCheckpointer
 from simdinov2.data import SamplerType, make_data_loader, make_dataset
-from simdinov2.data import collate_data_and_cast, DataAugmentationDINO, MaskingGenerator
+from simdinov2.data import collate_data_and_cast, DataAugmentationDINO, MaskingGenerator, WSIDataAugmentationDINO
+from simdinov2.data.samplers import SemanticHierarchicalSampler
 import simdinov2.distributed as dist
 from simdinov2.fsdp import DCPCheckpointer as FSDPCheckpointer
 from simdinov2.logging import MetricLogger
@@ -29,6 +32,110 @@ from simdinov2.train.ssl_meta_arch_sim import SimSSLMetaArch
 import pickle
 torch.backends.cuda.matmul.allow_tf32 = True  # PyTorch 1.12 sets this to False by default
 logger = logging.getLogger("dinov2")
+
+
+def _sampler_type_from_config(cfg):
+    sampler_cfg = getattr(cfg.train, "sampler", None)
+    sampler_name = str(getattr(sampler_cfg, "type", "sharded_infinite")).strip().lower()
+    sampler_types = {
+        "infinite": SamplerType.INFINITE,
+        "sharded_infinite": SamplerType.SHARDED_INFINITE,
+        "sharded_infinite_new": SamplerType.SHARDED_INFINITE_NEW,
+        "semantic_hierarchical": SamplerType.SEMANTIC_HIERARCHICAL,
+    }
+    if sampler_name not in sampler_types:
+        raise ValueError(
+            f"Unsupported train.sampler.type={sampler_name!r}; "
+            f"expected one of {', '.join(sorted(sampler_types))}"
+        )
+    return sampler_types[sampler_name], sampler_cfg
+
+
+def _sampling_contract_from_sampler(sampler, cfg):
+    if not hasattr(sampler, "contract"):
+        return None
+    payload = {
+        "schema_version": 1,
+        **sampler.contract(),
+        "batch_size_per_gpu": int(cfg.train.batch_size_per_gpu),
+        "official_epoch_length": int(cfg.train.OFFICIAL_EPOCH_LENGTH),
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    payload["contract_id"] = hashlib.sha256(canonical).hexdigest()
+    return payload
+
+
+def _sampling_contract(data_loader, cfg):
+    return _sampling_contract_from_sampler(data_loader.sampler, cfg)
+
+
+def _persist_sampling_contract(output_dir, contract):
+    if contract is None:
+        return
+    path = os.path.join(output_dir, "sampling_contract.json")
+    error = None
+    if dist.is_main_process():
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as handle:
+                    existing = json.load(handle)
+                if existing != contract:
+                    raise RuntimeError(
+                        f"Semantic sampling contract does not match the existing run: {path}"
+                    )
+            else:
+                temporary = path + ".tmp"
+                with open(temporary, "w", encoding="utf-8") as handle:
+                    json.dump(contract, handle, indent=2, sort_keys=True)
+                    handle.write("\n")
+                os.replace(temporary, path)
+        except Exception as exception:
+            error = str(exception)
+    if dist.is_enabled():
+        errors = [error]
+        torch.distributed.broadcast_object_list(errors, src=0)
+        error = errors[0]
+    if error is not None:
+        raise RuntimeError(error)
+    with open(path, "r", encoding="utf-8") as handle:
+        persisted = json.load(handle)
+    if persisted != contract:
+        raise RuntimeError(f"Semantic sampling contract mismatch across ranks: {path}")
+
+
+def _collective_run_checkpoint(checkpointer, resume):
+    if not resume:
+        return False
+    local_marker = None
+    if checkpointer.has_checkpoint():
+        local_marker = os.path.basename(checkpointer.get_checkpoint_file())
+    if not dist.is_enabled():
+        return local_marker is not None
+    markers = [None] * dist.get_global_size()
+    torch.distributed.all_gather_object(markers, local_marker)
+    if len(set(markers)) != 1:
+        raise RuntimeError(
+            "Distributed checkpoint markers are missing or inconsistent across ranks: "
+            f"{markers}"
+        )
+    return local_marker is not None
+
+
+def _verify_compiled_entry_files(semantic_index):
+    error = None
+    if dist.is_main_process():
+        try:
+            semantic_index.verify_entry_files()
+        except Exception as exception:
+            error = str(exception)
+    if dist.is_enabled():
+        errors = [error]
+        torch.distributed.broadcast_object_list(errors, src=0)
+        error = errors[0]
+    if error is not None:
+        raise RuntimeError(error)
+
+
 def oom_observer(device, alloc, device_alloc, device_free):
     # snapshot right after an OOM happened
     print('saving allocated state during OOM')
@@ -179,25 +286,53 @@ def do_train(cfg, model, resume=False):
     fp16_scaler = model.fp16_scaler  # for mixed precision training
 
 
-    data_transform = DataAugmentationDINO(
+    #data_transform = DataAugmentationDINO(
+    #    cfg.crops.global_crops_scale,
+    #    cfg.crops.local_crops_scale,
+    #    cfg.crops.local_crops_number,
+    #    global_crops_size=cfg.crops.global_crops_size,
+    #    local_crops_size=cfg.crops.local_crops_size,
+    #)
+
+    data_transform = WSIDataAugmentationDINO(
         cfg.crops.global_crops_scale,
         cfg.crops.local_crops_scale,
         cfg.crops.local_crops_number,
         global_crops_size=cfg.crops.global_crops_size,
         local_crops_size=cfg.crops.local_crops_size,
+        max_white_ratio=cfg.crops.get("max_white_ratio", 1.0),
+        tissue_hsv_lower=cfg.crops.get("tissue_hsv_lower", (90, 8, 103)),
+        tissue_hsv_upper=cfg.crops.get("tissue_hsv_upper", (180, 255, 255)),
+        tissue_crop_max_attempts=cfg.crops.get("tissue_crop_max_attempts", 10),
     )
 
     dataset = make_dataset(
         dataset_str=cfg.train.dataset_path,
         transform=data_transform,
-        target_transform=lambda _: (),
     )
+    sampler_type, sampler_cfg = _sampler_type_from_config(cfg)
     OFFICIAL_EPOCH_LENGTH = cfg.train.OFFICIAL_EPOCH_LENGTH
     #for example, imagenet1k training set have 1281167 images. for 4nodes(32gpu) and 32 batch size per gpu, approximately 1250 iterations per epoch
     if OFFICIAL_EPOCH_LENGTH <= 0:
+        if sampler_type == SamplerType.SEMANTIC_HIERARCHICAL:
+            raise ValueError(
+                "train.OFFICIAL_EPOCH_LENGTH must be explicitly positive for semantic hierarchical sampling"
+            )
         OFFICIAL_EPOCH_LENGTH = len(dataset) // (cfg.train.batch_size_per_gpu * dist.get_global_size())
         print(f"OFFICIAL_EPOCH_LENGTH is not defined, set as {OFFICIAL_EPOCH_LENGTH} by dataset size and batch size")
         cfg.train.OFFICIAL_EPOCH_LENGTH = OFFICIAL_EPOCH_LENGTH
+    preflight_sampling_contract = None
+    if sampler_type == SamplerType.SEMANTIC_HIERARCHICAL:
+        semantic_index = dataset.get_semantic_sampling_index()
+        _verify_compiled_entry_files(semantic_index)
+        preflight_sampler = SemanticHierarchicalSampler(
+            semantic_index=semantic_index,
+            magnification_weights=sampler_cfg.magnification_weights,
+            bucket_weights=sampler_cfg.bucket_weights,
+            seed=cfg.train.seed,
+        )
+        preflight_sampling_contract = _sampling_contract_from_sampler(preflight_sampler, cfg)
+        _persist_sampling_contract(cfg.train.output_dir, preflight_sampling_contract)
     # setup optimizer
     optimizer = build_optimizer(cfg, model)
     (
@@ -213,10 +348,18 @@ def do_train(cfg, model, resume=False):
     ) = build_schedulers(cfg)
 
     # checkpointer
+    start_iter = 0
+    if cfg.MODEL.INIT_WEIGHTS != "":
+        model.load_state_dict(torch.load(cfg.MODEL.INIT_WEIGHTS, map_location="cpu"), strict = False)
     checkpointer = FSDPCheckpointer(model, cfg.train.output_dir, optimizer=optimizer, save_to_disk=True)
+    had_run_checkpoint = _collective_run_checkpoint(checkpointer, resume)
+    checkpoint_state = {}
     try:
-        start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
+        checkpoint_state = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume)
+        start_iter = checkpoint_state.get("iteration", -1) + 1
     except Exception as e:
+        if sampler_type == SamplerType.SEMANTIC_HIERARCHICAL:
+            raise RuntimeError("Failed to load a semantic-sampling training checkpoint") from e
         print("Failed to load checkpoint", e)
         traceback.print_exc()
         start_iter = 0
@@ -250,8 +393,6 @@ def do_train(cfg, model, resume=False):
     )
 
     # setup data loader
-    # sampler_type = SamplerType.INFINITE
-    sampler_type = SamplerType.SHARDED_INFINITE
     data_loader = make_data_loader(
         dataset=dataset,
         batch_size=cfg.train.batch_size_per_gpu,
@@ -260,9 +401,23 @@ def do_train(cfg, model, resume=False):
         seed=cfg.train.seed,  # TODO: Fix this -- cfg.train.seed
         sampler_type=sampler_type,
         sampler_advance=start_iter * cfg.train.batch_size_per_gpu,  # TODO(qas): fix this -- start_iter * cfg.train.batch_size_per_gpu,
+        sampler_config=sampler_cfg,
         drop_last=True,
         collate_fn=collate_fn,
     )
+    sampling_contract = _sampling_contract(data_loader, cfg)
+    if sampling_contract != preflight_sampling_contract:
+        raise RuntimeError("Semantic sampling contract changed during data-loader setup")
+    _persist_sampling_contract(cfg.train.output_dir, sampling_contract)
+    checkpoint_contract = checkpoint_state.get("sampling_contract")
+    checkpoint_has_progress = had_run_checkpoint or int(checkpoint_state.get("iteration", -1)) >= 0
+    contract_required = checkpoint_contract is not None or (
+        sampling_contract is not None and checkpoint_has_progress
+    )
+    if contract_required and checkpoint_contract != sampling_contract:
+        raise RuntimeError(
+            "Checkpoint semantic sampling contract does not match the current index, policy, or topology"
+        )
 
     # training loop
 
@@ -383,7 +538,10 @@ def do_train(cfg, model, resume=False):
         if eval_period_iterations > 0 and (iteration + 1) % eval_period_iterations == 0:
             do_test(cfg, model, f"training_{iteration}")
             torch.cuda.synchronize()
-        periodic_checkpointer.step(iteration)
+        checkpoint_kwargs = {}
+        if sampling_contract is not None:
+            checkpoint_kwargs["sampling_contract"] = sampling_contract
+        periodic_checkpointer.step(iteration, **checkpoint_kwargs)
 
         iteration = iteration + 1
     metric_logger.synchronize_between_processes()

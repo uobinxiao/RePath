@@ -454,9 +454,9 @@ class DinoVisionTransformer(nn.Module):
             return feat_out["output"]
         # print("feat out shape:", feat_out["qkv"].shape)
         qkv = (
-                feat_out["output"][:, self.num_tokens + self.num_register_tokens:]
-                .reshape(bs, num_patches, 3, -1)
-            )
+            feat_out["output"][:, self.num_tokens + self.num_register_tokens :]
+            .reshape(bs, num_patches, 3, -1)
+        )
         q, k, v = qkv.unbind(dim=2) #B, N, C
 
         # Modality selection

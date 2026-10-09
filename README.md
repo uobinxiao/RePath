@@ -1,258 +1,114 @@
-# Simplifying DINO via Coding Rate Regularization
+# RePath: Towards Efficient and Reproducible Foundation Models for Computational Pathology (Under Review)
 
-PyTorch implementation and pretrained models for SimDINO and SimDINOv2.
 
-<div align="center">
-  <image src="assets/pipelines.png" width="840px" />
-  <p></p>
-</div>
+## Configure local paths
 
-Authors: [Ziyang Wu](https://robinwu218.github.io/), [Jingyuan Zhang](https://github.com/ultranity), [Druv Pai](https://druvpai.github.io/), [Xudong Wang](https://people.eecs.berkeley.edu/~xdwang/), [Chandan Singh](https://csinva.io/), [Jianwei Yang](https://jwyang.github.io/), [Jianfeng Gao](https://www.microsoft.com/en-us/research/people/jfgao/), [Yi Ma](https://people.eecs.berkeley.edu/~yima/)
+The released WSI scripts and configurations use placeholders for local paths, slide examples, and SLURM settings. Configure the values needed by your workflow before running preprocessing or training. 
 
-[[`Paper`](https://arxiv.org/abs/2502.10385)] [[`Website`](https://robinwu218.github.io/SimDINO)] [[`BibTeX`](#citing-simdino)]
+1. Open [`configure_paths.py`](configure_paths.py) and fill in the values in the `REPLACEMENTS` dictionary at the top of the file. 
+2. Preview the replacements from the repository root:
 
-## Update
-[02/25/25] We release code and pretrained checkpoints for SimDINO and SimDINOv2.
+   ```shell
+   python3 configure_paths.py --dry-run
+   ```
 
-## Pretrained models
-We provide checkpoints for both SimDINO and SimDINOv2 pretrained on ImageNet-1k for 100 epochs following configs detailed in our [paper](https://arxiv.org/abs/2502.10385).
+3. Apply them to your local source and configuration files:
 
-<table style="margin: auto">
-  <thead>
-    <tr>
-      <th>model</th>
-      <th># of<br />params</th>
-      <th>Algorithm</th>
-      <th>ImageNet<br />k-NN</th>
-      <th>ImageNet<br />linear</th>
-      <th>download</th>
-    </tr>
-  </thead>
-  <tbody>
-  <tr>
-      <td>ViT-B/16</td>
-      <td align="right">86 M</td>
-      <td align="center">SimDINO</td>
-      <td align="right">74.9%</td>  
-      <td align="right">77.3%</td>
-      <td><a href="https://drive.google.com/file/d/1nqcX0IgKQ8H3ZFJKaEx_O5wTVqdorLyQ/view?usp=drive_link">ckpt</a></td>
-    </tr>
-    <tr>
-      <td>ViT-L/16</td>
-      <td align="right">300 M</td>
-      <td align="center">SimDINO</td>
-      <td align="right">75.6%</td>
-      <td align="right">77.4%</td>
-      <td><a href="https://drive.google.com/file/d/1jy27VYHHSxllMqWr5DiKk80y9ZBrKkPV/view?usp=drive_link">ckpt</a></td>
-    </tr>
-    <tr>
-      <td>ViT-B/16</td>
-      <td align="right">86 M</td>
-      <td align="center">SimDINOv2</td>
-      <td align="right">78.1%</td>
-      <td align="right">79.7%</td>
-      <td><a href="https://drive.google.com/file/d/1g_f3aEFdfiKCn8IH11Y4FwtEDu1pPbQv/view?usp=drive_link">ckpt</a></td>
-    </tr>
-    <tr>
-      <td>ViT-L/16</td>
-      <td align="right">300 M</td>
-      <td align="center">SimDINOv2</td>
-      <td align="right">81.1%</td>
-      <td align="right">82.4%</td>
-      <td><a href="https://drive.google.com/file/d/1IotEWszh1chGtzwl8X_ul6j3ACT7Tn6i/view?usp=drive_link">ckpt</a></td>
-    </tr>
-  </tbody>
-</table>
+   ```shell
+   python3 configure_paths.py
+   ```
 
-Below we also provide the checkpoints for the original DINO and DINOv2 models that we trained.
-
-<table style="margin: auto">
-  <thead>
-    <tr>
-      <th>model</th>
-      <th># of<br />params</th>
-      <th>Algorithm</th>
-      <th>ImageNet<br />k-NN</th>
-      <th>ImageNet<br />linear</th>
-      <th>download</th>
-    </tr>
-  </thead>
-  <tbody>
-  <tr>
-      <td>ViT-B/16</td>
-      <td align="right">86 M</td>
-      <td align="center">DINO</td>
-      <td align="right">72.9%</td>
-      <td align="right">76.3%</td>
-      <td><a href="https://drive.google.com/file/d/1o-FtJ0TDNPAZiREa_qjGENksYL_3Ohc8/view?usp=drive_link">ckpt</a></td>
-    </tr>
-    <tr>
-      <td>ViT-B/16</td>
-      <td align="right">86 M</td>
-      <td align="center">DINOv2</td>
-      <td align="right">76.0%</td>
-      <td align="right">77.2%</td>
-      <td><a href="https://drive.google.com/file/d/1QZpUkC_yX2V9rWqHW3qLTFfvD6BUqyN_/view?usp=drive_link">ckpt</a></td>
-    </tr>
-    <tr>
-      <td>ViT-L/16</td>
-      <td align="right">300 M</td>
-      <td align="center">DINOv2</td>
-      <td align="right">80.8%</td>
-      <td align="right">82.0%</td>
-      <td><a href="https://drive.google.com/file/d/1p-cUWNShnZEFBJ_mnw77HnvCFIV0FthN/view?usp=drive_link">ckpt</a></td>
-    </tr>
-  </tbody>
-</table>
-
-Note: our compute resource is limited but we are working on scaling up our approach. Stay tuned for more model checkpoints in the future. Meanwhile, we always welcome and appreciate feedback and help from the community. 
-
-## Installation
-
-Our implementation requires Python 3.11+, PyTorch 2.4+ and [xFormers](https://github.com/facebookresearch/xformers) 0.0.29+ and some other packages. Note that the code has only been tested with the specified versions and also expects a Linux environment. To setup the dependencies, please install via:
-
-```sh
-pip install -r requirements.txt
-```
-
+Empty values leave their placeholders unchanged. The script reports the files updated and the remaining placeholders; configure those required by the tasks you intend to run. 
 
 ## Data preparation
 
-First, you need to download the [ImageNet-1k](https://www.image-net.org/download.php) dataset.
+First, you need to download the [TCGA](https://portal.gdc.cancer.gov/analysis_page?app=Downloads) dataset. Set Experimental Strategy as Diagnostic Slide,  Access as Open to filter the slides. 
 
-The root directory of the dataset should hold the following contents:
+### Preprocessing with TRIDENT
 
-- `<ROOT>/test/ILSVRC2012_test_00000001.JPEG`
-- `<ROOT>/test/[..]`
-- `<ROOT>/test/ILSVRC2012_test_00100000.JPEG`
-- `<ROOT>/train/n01440764/n01440764_10026.JPEG`
-- `<ROOT>/train/[...]`
-- `<ROOT>/train/n15075141/n15075141_9993.JPEG`
-- `<ROOT>/val/n01440764/ILSVRC2012_val_00000293.JPEG`
-- `<ROOT>/val/[...]`
-- `<ROOT>/val/n15075141/ILSVRC2012_val_00049174.JPEG`
-- `<ROOT>/labels.txt`
+Install [TRIDENT](https://github.com/mahmoodlab/TRIDENT) in your preprocessing environment and obtain a local CONCH v1 checkpoint. The preprocessing workflow requires a CUDA GPU and OpenSlide, including its native library, for reading SVS files. Install the clustering dependencies in the same environment:
 
-Specific to SimDINOv2, you need to configure and run `python prepare.py` to generate some metadata files.
-The generated files should have the following structure:
+```shell
+python3 -m pip install -r hierarchical_clustering/requirements.txt
+```
 
-- `<EXTRA>/class-ids-TRAIN.npy`
-- `<EXTRA>/class-ids-VAL.npy`
-- `<EXTRA>/class-names-TRAIN.npy`
-- `<EXTRA>/class-names-VAL.npy`
-- `<EXTRA>/entries-TEST.npy`
-- `<EXTRA>/entries-TRAIN.npy`
-- `<EXTRA>/entries-VAL.npy`
+Follow the five preprocessing steps in
+[`preprocess/trident_preprocess`](preprocess/trident_preprocess):
 
+1. [Tissue segmentation](preprocess/trident_preprocess/step1_tissue_seg.sh).
+2. [Patch coordinate generation](preprocess/trident_preprocess/step2_tissue_patching.sh).
+3. [CONCH patch feature extraction](preprocess/trident_preprocess/step3_patch_feature_extraction.sh).
+4. [Text-aligned feature projection](preprocess/trident_preprocess/step4_convert_conch_trident_features.py).
+5. [HSV tissue filtering](preprocess/trident_preprocess/step5_gen_hsv_filtered_patches.py).
+
+Run **Step 1 once**, then run **Steps 2–5 separately for each magnification: 5x, 10x, 20x, and 40x**. Before processing each magnification, update `--mag` in Steps 2, 3, and 5, and the corresponding input/output paths in Steps 4 and 5. Keep the magnification consistent across all four steps. The Step 2 and Step 3 scripts use 40x as an example; change it for each run.
+
+### Hierarchical clustering and offline semantic index
+
+Prepare `metadata_with_organ.json` as a JSON list with one record per slide. Export the GDC slide metadata and join the corresponding case and patient information. Slide filenames must match the TRIDENT feature files:
+
+```json
+[
+  {
+    "slide_submitter_id": "example_slide",
+    "patient_id": "example_patient",
+    "file_id": "example_file_id",
+    "case_id": "example_case_id",
+    "file_name": "example_slide.svs",
+    "primary_site": "Bronchus and lung",
+    "project_id": "TCGA-LUAD",
+    "disease_type": "Lung Adenocarcinoma"
+  }
+]
+```
+
+Configure the paths at the top of [`run_samples.sh`](hierarchical_clustering/run_samples.sh): raw features, projected features, and HSV filters for all four magnifications, plus `WSI_ROOT`, `CHECKPOINT_PATH`, `METADATA_PATH`, and the output paths. Use absolute paths and the same CONCH v1 checkpoint used during preprocessing. Run the script once from the repository root:
+
+```shell
+bash hierarchical_clustering/run_samples.sh
+```
+
+The script processes 5x, 10x, 20x, and 40x in one run, builds a separate hierarchy for each magnification, encodes the pathology prompts, and runs all eight offline-index stages. It writes the configuration to `CONFIG_OUTPUT` and the index to `OFFLINE_OUTPUT`, as configured in the script.
+
+The first run leaves the index unapproved. Inspect `audit_report.html` and the montages in `OFFLINE_OUTPUT`, then copy `audit_review_template.csv` and fill in `reviewer`, `decision`, and optional `notes`. Keep the cluster identifiers and run-binding columns unchanged. Every selected cluster needs a reviewer and a passing decision (`pass`, `approved`, or `approve`).
+
+Finalize the reviewed index using the `CONFIG_OUTPUT` path and your completed review CSV:
+
+```shell
+python3 hierarchical_clustering/run_remote_offline.py finalize \
+    --config "/path/to/offline_tcga.json" \
+    --review-csv "/path/to/completed_audit_review.csv"
+```
+
+Successful finalization records `approved: true` in `OFFLINE_OUTPUT/run_manifest.json`. Use `OFFLINE_OUTPUT` as `--offline-index` in the training preparation command below.
 
 ## Training
 
-### Training SimDINO on ImageNet-1k
+1. Compile the approved offline index into memory-mapped WSIPatch files once before training. Replace the paths below with your index and compiler output directories:
 
-You can train SimDINO on ViT-B/16 with an 8-GPU node (each with at least 40G memory):
+   ```shell
+   python preprocess/extra_file_creation/prepare_offline_sampling.py \
+       --offline-index "/path/to/approved/offline_index" \
+       --output-dir "/path/to/compiled/wsipatch_extra" \
+       --split TRAIN
+   ```
 
-```shell
-cd simdino
-torchrun --nnodes=1 --nproc_per_node=8 main_dino.py --arch vit_base --patch_size 16 --local_crops_number 10 \
-    --eps 0.05 --coeff 1 --output_dir <PATH/TO/OUTPUT/DIR> --data_path <PATH/TO/DATASET/TRAIN> \
-    --track_wandb # to enable logging; use --track_wandb to log with wandb and --track_swan to log with swanlab
-```
-Training time is approximately 1.5 day and you should be able to replicate our reported results. An example log on ViT-B/16 can be found [here](assets/SimDNIOv1_vitb16.txt).
+2. Prepare initialization weights using [`preprocess/init_weight_transform`](preprocess/init_weight_transform). For SimDINOv2 checkpoints, choose the [ViT-B](preprocess/init_weight_transform/simdinov2_base_transform.py) or [ViT-L](preprocess/init_weight_transform/simdinov2_large_transform.py) script to match your training architecture. For DINOv2 backbone weights, use [`torch_to_fvcore.py`](preprocess/init_weight_transform/torch_to_fvcore.py). Set the input and output checkpoint paths inside the selected script before running it. For example, run the SimDINOv2 ViT-B conversion from the repository root:
 
-### Training SimDINOv2 on ImageNet-1k
+   ```shell
+   python preprocess/init_weight_transform/simdinov2_base_transform.py
+   ```
 
-You can train SimDINOv2 on ViT-L/16 with a 8-GPU node (each with at least 40G memory):
+3. Configure the repository-root [`train.sh`](train.sh): set the `SLURM_*` resources, `--config-file`, and `--output-dir`. In `train.dataset_path`, set `root` to your WSI directory and `extra` to the compiler output directory from Step 1. Keep the WSI paths consistent with the offline index. In the selected YAML, set `MODEL.INIT_WEIGHTS` to the converted checkpoint from Step 2 and adjust training settings such as batch size and `train.OFFICIAL_EPOCH_LENGTH`.
 
-```shell
-torchrun --nnodes=1 --nproc_per_node=8 simdinov2/train/train.py \
-    --config-file simdinov2/configs/simdino_config.yaml \
-    --output-dir <PATH/TO/OUTPUT/DIR> \
-    train.dataset_path=ImageNet:split=TRAIN:root=<PATH/TO/DATASET>:extra=<PATH/TO/DATASET>
-```
+4. Launch training from the repository root:
 
-Training time is approximately 1 day and you should be able to replicate our reported results. An example log on ViT-B/16 can be found [here](assets/SimDNIOv2-vitb16.json).
-The training code saves the weights of the teacher in the `eval` folder every 10 epochs for evaluation. You can change the `student.arch` field in `simdino_config.yaml` to train other models.
+   ```shell
+   bash train.sh
+   ```
 
-You can also use `submitit` if your environment happens to be a SLURM cluster:
-```shell
-python simdinov2/run/train/train.py \
-    --nodes 1 \
-    --config-file simdinov2/configs/simdino_config.yaml \
-    --output-dir <PATH/TO/OUTPUT/DIR> \
-    train.dataset_path=ImageNet:split=TRAIN:root=<PATH/TO/DATASET>:extra=<PATH/TO/DATASET>
-```
-
-### FAQ & Tips on Training
-**Q: How can I visualize the training losses?**
-
-**A:** In SimDINO, you can append the `--track_wandb` argument to enable wandb logging. If somehow wandb doesn't work, you can use `--track_wandb` to enable swanlab tracking instead.
-
-**Q: I notice some spikes in coding rate loss in early training stages. Is that normal?**
-
-**A:** Occasional spikes are normal and shouldn't impact final performance. If you notice too much instability, the following operations can help:
-- set `--expa_type=1`. Sometimes spikes are caused by sudden change in conditioning of the covariance matrix and this applies some "smoothing" by centering the student features and teacher features.
-- set a smaller `--eps`. 
-
-**Q: I can only use small batch sizes per gpu for training, what should I do?**
-
-**A:** You can set `--reduce_cov=1` to collect covariance matrices from multiple gpus via all_reduce. Empirically, we found that we don't have to do this even with 64 samples per GPU.
-
-
-## Evaluation
-
-The teacher weights are regularly saved and can be evaluated using the following scripts.
-
-### k-NN classification on ImageNet-1k with SimDINO
-For example, on ViT-B/16:
-```shell
-cd simdino
-torchrun --nproc_per_node=8 eval_knn.py --patch_size 16 --arch vit_base \
-    --pretrained_weights <PATH/TO/OUTPUT/DIR>/checkpoint.pth --data_path <PATH/TO/DATASET>
-```
-
-### Linear probing on ImageNet-1k with SimDINO
-For example, on ViT-B/16:
-```shell
-cd simdino
-torchrun --nproc_per_node=8 eval_linear.py --patch_size 16 --arch vit_base \
-    --pretrained_weights <PATH/TO/OUTPUT/DIR>/checkpoint.pth --data_path <PATH/TO/DATASET>
-```
-
-### k-NN classification on ImageNet-1k with SimDINOv2
-
-```shell
-python simdinov2/run/eval/knn.py \
-    --config-file <PATH/TO/OUTPUT/DIR>/config.yaml \
-    --pretrained-weights <PATH/TO/OUTPUT/DIR>/eval/training_24999/teacher_checkpoint.pth \
-    --output-dir <PATH/TO/OUTPUT/DIR>/eval/training_24999/knn \
-    --train-dataset ImageNet:split=TRAIN:root=<PATH/TO/DATASET>:extra=<PATH/TO/DATASET> \
-    --val-dataset ImageNet:split=VAL:root=<PATH/TO/DATASET>:extra=<PATH/TO/DATASET>
-```
-
-### Linear probing on ImageNet-1k with SimDINOv2
-
-```shell
-python simdinov2/run/eval/linear.py \
-    --config-file <PATH/TO/OUTPUT/DIR>/config.yaml \
-    --pretrained-weights <PATH/TO/OUTPUT/DIR>/eval/training_24999/teacher_checkpoint.pth \
-    --output-dir <PATH/TO/OUTPUT/DIR>/eval/training_24999/linear \
-    --train-dataset ImageNet:split=TRAIN:root=<PATH/TO/DATASET>:extra=<PATH/TO/DATASET> \
-    --val-dataset ImageNet:split=VAL:root=<PATH/TO/DATASET>:extra=<PATH/TO/DATASET>
-```
-
-
-## Citing SimDINO
-
-If you find this project useful, please consider giving us a star and citation:
-```
-@article{wu2025simplifying,
-  title={Simplifying DINO via Coding Rate Regularization},
-  author={Wu, Ziyang and Zhang, Jingyuan and Pai, Druv and Wang, XuDong and Singh, Chandan and Yang, Jianwei and Gao, Jianfeng and Ma, Yi},
-  journal={arXiv preprint arXiv:2502.10385},
-  year={2025}
-}
-```
+The script submits the training job to SLURM through Submitit and enables the `semantic_hierarchical` sampler.
 
 ## Acknowledgements
 
-This project is largely built upon the orignal [DINO](https://github.com/facebookresearch/dino) and [DINOv2](https://github.com/facebookresearch/dinov2) projects. 
+This project is largely built upon the orignal [DINO](https://github.com/facebookresearch/dino), [DINOv2](https://github.com/facebookresearch/dinov2) and [SimDINO](https://github.com/RobinWu218/SimDINO) projects.

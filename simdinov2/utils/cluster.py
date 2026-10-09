@@ -36,16 +36,18 @@ def get_cluster_type(cluster_type: Optional[ClusterType] = None) -> Optional[Clu
 
 
 def get_checkpoint_path(cluster_type: Optional[ClusterType] = None) -> Optional[Path]:
-    cluster_type = get_cluster_type(cluster_type)
-    if cluster_type is None:
-        return None
+    #cluster_type = get_cluster_type(cluster_type)
+    #if cluster_type is None:
+    #    return None
 
-    CHECKPOINT_DIRNAMES = {
-        ClusterType.AWS: "checkpoints",
-        ClusterType.FAIR: "checkpoint",
-        ClusterType.RSC: "checkpoint/dino",
-    }
-    return Path(".") / CHECKPOINT_DIRNAMES[cluster_type]
+    #CHECKPOINT_DIRNAMES = {
+    #    ClusterType.AWS: "checkpoints",
+    #    ClusterType.FAIR: "checkpoint",
+    #    ClusterType.RSC: "checkpoint/dino",
+    #}
+    #return Path(".") / CHECKPOINT_DIRNAMES[cluster_type]
+
+    return Path("__REPATH_PRIVATE_PROJECT_ROOT_002__/dinov2_checkpoints/")
 
 
 def get_user_checkpoint_path(cluster_type: Optional[ClusterType] = None) -> Optional[Path]:
@@ -53,44 +55,35 @@ def get_user_checkpoint_path(cluster_type: Optional[ClusterType] = None) -> Opti
     if checkpoint_path is None:
         return None
 
-    username = os.environ.get("USER")
-    assert username is not None
-    return checkpoint_path / username
+    #username = os.environ.get("USER")
+    #assert username is not None
+    #return checkpoint_path / username
 
-
-def get_slurm_partition(cluster_type: Optional[ClusterType] = None) -> Optional[str]:
-    cluster_type = get_cluster_type(cluster_type)
-    if cluster_type is None:
-        return None
-
-    SLURM_PARTITIONS = {
-        ClusterType.AWS: "learnlab",
-        ClusterType.FAIR: "learnlab",
-        ClusterType.RSC: "learn",
-    }
-    return SLURM_PARTITIONS[cluster_type]
+    return checkpoint_path
 
 
 def get_slurm_executor_parameters(
-    nodes: int, num_gpus_per_node: int, cpus_per_task:int = 0, mem_gb:int = 0,cluster_type: Optional[ClusterType] = None, **kwargs
+    nodes: int,
+    num_gpus_per_node: int,
+    cpus_per_task: Optional[int] = None,
+    mem_gb: Optional[int] = None,
+    slurm_partition: Optional[str] = None,
+    slurm_account: Optional[str] = None,
+    cluster_type: Optional[ClusterType] = None,
+    **kwargs,
 ) -> Dict[str, Any]:
-    # create default parameters
     params = {
-        "mem_gb": 64 * num_gpus_per_node if mem_gb==0 else mem_gb,  # Requests all memory on a node, see https://slurm.schedmd.com/sbatch.html
         "gpus_per_node": num_gpus_per_node,
         "tasks_per_node": num_gpus_per_node,  # one task per GPU
-        "cpus_per_task": 20 if cpus_per_task==0 else  cpus_per_task,
         "nodes": nodes,
-        "slurm_partition": get_slurm_partition(cluster_type),
     }
+    optional_params = {
+        "cpus_per_task": cpus_per_task,
+        "mem_gb": mem_gb,
+        "slurm_partition": slurm_partition,
+        "slurm_account": slurm_account,
+    }
+    params.update({key: value for key, value in optional_params.items() if value not in (None, "")})
     print(params)
-    # apply cluster-specific adjustments
-    cluster_type = get_cluster_type(cluster_type)
-    if cluster_type == ClusterType.AWS:
-        params["cpus_per_task"] = 12
-        del params["mem_gb"]
-    elif cluster_type == ClusterType.RSC:
-        params["cpus_per_task"] = 12
-    # set additional parameters / apply overrides
     params.update(kwargs)
     return params

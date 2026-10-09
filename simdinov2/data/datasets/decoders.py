@@ -19,6 +19,8 @@ class ImageDataDecoder(Decoder):
         self._image_data = image_data
 
     def decode(self) -> Image:
+        if isinstance(self._image_data, Image.Image):
+            return self._image_data
         f = BytesIO(self._image_data)
         return Image.open(f).convert(mode="RGB")
 

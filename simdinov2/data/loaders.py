@@ -10,8 +10,9 @@ from typing import Any, Callable, List, Optional, TypeVar
 import torch
 from torch.utils.data import Sampler
 
-from .datasets import ImageNet, ImageNet21k
-from .samplers import EpochSampler, InfiniteSampler, ShardedInfiniteSampler
+from .datasets import ImageNet, ImageNet21k, WSIPatch
+from .datasets import tune_vips_cache
+from .samplers import EpochSampler, InfiniteSampler, SemanticHierarchicalSampler, ShardedInfiniteSampler
 
 
 logger = logging.getLogger("dinov2")
@@ -23,6 +24,7 @@ class SamplerType(Enum):
     INFINITE = 2
     SHARDED_INFINITE = 3
     SHARDED_INFINITE_NEW = 4
+    SEMANTIC_HIERARCHICAL = 5
 
 
 def _make_bool_str(b: bool) -> str:
@@ -62,6 +64,8 @@ def _parse_dataset_str(dataset_str: str):
             kwargs["split"] = ImageNet21k.Split[kwargs["split"]]
     elif name == "ImageNet22k":
         class_ = ImageNet22k
+    elif name == "WSIPatch":
+        class_ = WSIPatch
     else:
         raise ValueError(f'Unsupported dataset "{name}"')
 
@@ -109,6 +113,7 @@ def _make_sampler(
     seed: int = 0,
     size: int = -1,
     advance: int = 0,
+    sampler_config: Optional[Any] = None,
 ) -> Optional[Sampler]:
     sample_count = len(dataset)
 
@@ -159,12 +164,30 @@ def _make_sampler(
             seed=seed,
             drop_last=False,
         )
+    elif type == SamplerType.SEMANTIC_HIERARCHICAL:
+        if size > 0:
+            raise ValueError("sampler size > 0 is invalid")
+        if sampler_config is None:
+            raise ValueError("semantic hierarchical sampler requires sampler_config")
+        if not hasattr(dataset, "get_semantic_sampling_index"):
+            raise TypeError("semantic hierarchical sampler requires a WSIPatch semantic dataset")
+        logger.info("sampler: semantic hierarchical")
+        return SemanticHierarchicalSampler(
+            semantic_index=dataset.get_semantic_sampling_index(),
+            magnification_weights=sampler_config.magnification_weights,
+            bucket_weights=sampler_config.bucket_weights,
+            seed=seed,
+            advance=advance,
+        )
 
     logger.info("sampler: none")
     return None
 
 
 T = TypeVar("T")
+
+def vips_worker_init(worker_id):
+    tune_vips_cache(concurrency=2, max_nodes=128, max_mem_bytes=128*1024**2, max_files=128)
 
 
 def make_data_loader(
@@ -177,6 +200,7 @@ def make_data_loader(
     sampler_type: Optional[SamplerType] = SamplerType.INFINITE,
     sampler_size: int = -1,
     sampler_advance: int = 0,
+    sampler_config: Optional[Any] = None,
     drop_last: bool = True,
     persistent_workers: bool = False,
     collate_fn: Optional[Callable[[List[T]], Any]] = None,
@@ -190,9 +214,10 @@ def make_data_loader(
         num_workers: The number of workers to use.
         shuffle: Whether to shuffle samples.
         seed: The random seed to use.
-        sampler_type: Which sampler to use: EPOCH, INFINITE, SHARDED_INFINITE, SHARDED_INFINITE_NEW, DISTRIBUTED or None.
+        sampler_type: Which sampler to use, including SEMANTIC_HIERARCHICAL for compiled WSIPatch indexes.
         sampler_size: The number of images per epoch (when applicable) or -1 for the entire dataset.
         sampler_advance: How many samples to skip (when applicable).
+        sampler_config: Magnification and bucket weights for semantic sampling.
         drop_last: Whether the last non-full batch of data should be dropped.
         persistent_workers: maintain the workers Dataset instances alive after a dataset has been consumed once.
         collate_fn: Function that performs batch collation
@@ -205,6 +230,7 @@ def make_data_loader(
         seed=seed,
         size=sampler_size,
         advance=sampler_advance,
+        sampler_config=sampler_config,
     )
 
     logger.info("using PyTorch data loader")
@@ -212,11 +238,13 @@ def make_data_loader(
         dataset,
         sampler=sampler,
         batch_size=batch_size,
+        worker_init_fn = vips_worker_init,
         num_workers=num_workers,
         pin_memory=True,
         drop_last=drop_last,
         persistent_workers=persistent_workers,
         collate_fn=collate_fn,
+        prefetch_factor = 2,
     )
 
     try:
